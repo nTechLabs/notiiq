@@ -1,0 +1,20 @@
+:root {
+  font-family: Inter, Pretendard, "Noto Sans KR", "Segoe UI", sans-serif;
+  color: #26332d;
+  background:
+    radial-gradient(circle at 85% 5%, rgba(251, 203, 174, 0.42), transparent 28rem),
+    linear-gradient(180deg, #f8faf5 0%, #f1f5ef 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
