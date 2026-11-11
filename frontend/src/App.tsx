@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, DragEvent, FormEvent } from 'react'
 import './App.css'
 
-type CalendarEvent = {
+export type CalendarEvent = {
   title: string
   start: string
   end: string
@@ -56,7 +56,6 @@ function createCalendarFile(event: CalendarEvent) {
     `DTSTART:${icsDate(event.start)}`,
     `DTEND:${icsDate(event.end)}`,
     `SUMMARY:${escapeIcs(event.title)}`,
-    `DESCRIPTION:${escapeIcs(event.source_text)}`,
     'END:VEVENT',
     'END:VCALENDAR',
   ].join('\r\n')
@@ -72,6 +71,19 @@ function isMobileDevice() {
     /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
     (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
   )
+}
+
+function isAndroidDevice() {
+  return /Android/i.test(navigator.userAgent)
+}
+
+export function createGoogleCalendarUrl(event: CalendarEvent) {
+  const parameters = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: event.title,
+    dates: `${icsDate(event.start)}/${icsDate(event.end)}`,
+  })
+  return `https://calendar.google.com/calendar/render?${parameters.toString()}`
 }
 
 function App() {
@@ -167,6 +179,12 @@ function App() {
     const file = createCalendarFile(calendarEvent)
     setCalendarMessage('')
     setError('')
+
+    if (isAndroidDevice()) {
+      submitEvent.preventDefault()
+      window.location.assign(createGoogleCalendarUrl(calendarEvent))
+      return
+    }
 
     if (
       isMobileDevice() &&
@@ -354,7 +372,7 @@ function App() {
                       className="calendar-button"
                       disabled={!event.title.trim()}
                     >
-                      기본 캘린더로 열기
+                      {isAndroidDevice() ? 'Google 캘린더에 추가' : '기본 캘린더로 열기'}
                     </button>
                   </form>
                 </article>

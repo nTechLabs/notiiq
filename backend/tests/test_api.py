@@ -75,6 +75,7 @@ def test_download_calendar_returns_ics_attachment() -> None:
     assert response.headers["content-type"].startswith("text/calendar")
     assert response.headers["content-disposition"] == 'attachment; filename="notiiq-event.ics"'
     assert "SUMMARY:프로젝트 회의" in response.text
+    assert "DESCRIPTION:" not in response.text
     assert "SEQUENCE:0" in response.text
     assert "METHOD:PUBLISH" in response.text
 

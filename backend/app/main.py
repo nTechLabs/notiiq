@@ -96,7 +96,6 @@ async def download_calendar(
             f"DTSTART:{_ics_date(event.start)}",
             f"DTEND:{_ics_date(event.end)}",
             f"SUMMARY:{_escape_ics(event.title)}",
-            f"DESCRIPTION:{_escape_ics(event.source_text)}",
             "END:VEVENT",
             "END:VCALENDAR",
         ]
