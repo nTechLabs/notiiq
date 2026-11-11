@@ -1,6 +1,6 @@
 # Notiiq
 
-대화 캡처 이미지에서 OCR로 텍스트를 추출하고, 날짜와 시간이 포함된 일정 후보를 찾아 사용자가 확인한 일정을 캘린더에 등록하는 웹 애플리케이션입니다.
+메신저 대화와 학교 안내문 캡처에서 OCR로 텍스트를 추출하고, 약속·수행평가·시험·과제·발표 일정 후보를 찾아 사용자가 확인한 일정을 캘린더에 등록하는 로컬 우선 웹 애플리케이션입니다.
 
 업로드한 이미지와 OCR 텍스트는 요청을 처리하는 동안 메모리에서만 사용하며 파일, 데이터베이스, 브라우저 저장소에 보관하지 않습니다.
 
@@ -10,8 +10,10 @@
 - 한 번에 최대 20개 이미지 처리
 - EasyOCR 기반 한국어/영어 텍스트 인식
 - Ollama `qwen3:8b` 로컬 AI 기반 약속·과제·수행평가 일정 문맥 및 제목 추출
+- 모델이 인용한 원문 근거를 실제 OCR 텍스트와 다시 대조해 근거 없는 결과 제외
 - 일정 제목, 시작 시간, 종료 시간, 인식 신뢰도 표시
 - Android에서는 Google Calendar 등록 화면으로 연결하고, 그 외 환경에서는 사용자가 확인한 일정만 `.ics` 캘린더 파일로 생성
+- 캘린더에는 제목과 일시만 전달하고 OCR 원문과 상세 분석 내용은 제외
 - 업로드 이미지 및 OCR 텍스트 비저장
 - 모바일 화면과 키보드 탐색 지원
 
@@ -23,7 +25,7 @@
 | Backend | FastAPI, Pydantic |
 | OCR | EasyOCR, PyTorch CPU, OpenCV |
 | Local AI | Ollama, qwen3:8b |
-| Test | Pytest |
+| Test | Pytest, Vitest, oxlint |
 | Python | 3.12 |
 
 ## 프로젝트 구조
@@ -38,6 +40,7 @@ notiiq/
 ├─ backend/
 │  ├─ app/
 │  │  ├─ main.py
+│  │  ├─ llm_service.py
 │  │  ├─ models.py
 │  │  ├─ ocr_service.py
 │  │  └─ schedule_parser.py
@@ -48,6 +51,7 @@ notiiq/
 │  ├─ package.json
 │  └─ vite.config.ts
 ├─ requirements.txt
+├─ idea.md
 └─ workflow.md
 ```
 
@@ -191,6 +195,9 @@ EasyOCR 한국어/영어 모델을 처음 초기화할 때는 모델 다운로�
 있을 수 있으므로 등록 전에 제목과 기간을 확인하고 필요한 경우 캘린더 저장 화면에서
 수정하세요.
 
+현재 장소는 별도 필드로 추출하지 않으며 캘린더에 임의의 장소를 넣지 않습니다. 장소
+추출과 수정 UI는 향후 개선 항목입니다.
+
 ## API
 
 ### 상태 확인
@@ -238,6 +245,10 @@ Content-Type: multipart/form-data
 }
 ```
 
+`source_text`는 모델이 만든 일정이 실제 OCR 원문에 근거하는지 서버에서 검증하고 사용자가
+OCR 결과를 확인하기 위한 필드입니다. Google Calendar 또는 `.ics`의 설명에는 저장하지
+않습니다.
+
 ## 개인정보 처리 원칙
 
 - 업로드 이미지를 서버 디스크나 데이터베이스에 저장하지 않습니다.
@@ -248,7 +259,8 @@ Content-Type: multipart/form-data
 - OCR 결과를 `localStorage`, `sessionStorage`, IndexedDB에 저장하지 않습니다.
 - API 응답에 `Cache-Control: no-store`와 `Pragma: no-cache`를 적용합니다.
 - 요청이 끝나면 업로드 이미지와 OCR 결과에 대한 메모리 참조가 폐기됩니다.
-- 캘린더 파일은 사용자가 명시적으로 등록 버튼을 누른 경우에만 브라우저에서 생성됩니다.
+- 캘린더 등록은 사용자가 명시적으로 버튼을 누른 경우에만 시작됩니다.
+- 캘린더에는 OCR 원문이나 분석 상세 내용을 설명으로 저장하지 않습니다.
 
 EasyOCR 모델 파일은 사용자 환경에 캐시될 수 있지만 모델에는 업로드 이미지나 대화 내용이 포함되지 않습니다.
 
@@ -267,6 +279,13 @@ Set-Location frontend
 npm run lint
 ```
 
+### Frontend 테스트
+
+```powershell
+Set-Location frontend
+npm test
+```
+
 ### Frontend production build
 
 ```powershell
@@ -282,7 +301,7 @@ npm run build
 
 | 에이전트 | 담당 |
 |---|---|
-| `FE` | React UI, 이미지 업로드, 일정 검토, ICS 생성 |
+| `FE` | React UI, 이미지 업로드, 일정 검토, Android Google Calendar 연결, ICS 생성 |
 | `BE` | FastAPI, EasyOCR, 일정 추출, 입력 검증, 개인정보 제어 |
 | `QA` | API 계약, OCR 정확도, UI 흐름, 캘린더 결과, 개인정보 회귀 테스트 |
 
@@ -321,11 +340,15 @@ EasyOCR가 한국어와 영어 모델을 처음 내려받고 PyTorch 모델을 �
 - 한 번에 선택한 파일이 20개 이하인지 확인
 - 손상된 이미지가 아닌지 확인
 
+일정이 0개로 표시되면 화면의 `OCR 텍스트 확인`을 펼쳐 과목명, 주제, 날짜 또는 주차가
+인식되었는지 확인하세요. Ollama가 실행 중인지와 `qwen3:8b` 모델이 설치되었는지도
+확인해야 합니다.
+
 ## 향후 개선 항목
 
 - 자연어 일정 표현 및 상대 날짜 인식 확대
-- 일정 제목과 장소 분리
-- 사용자 수정 후 캘린더 등록
+- 일정 장소를 별도 필드로 추출해 캘린더 장소에만 저장
+- 시작·종료 시각과 장소 수정 UI
 - OCR 결과 영역별 정렬 정확도 개선
 - 개인정보 저장 정책을 유지하는 로컬 일정 분석 모델 도입
 - OAuth 보안 정책 수립 후 Google Calendar 또는 Microsoft Calendar 연동
