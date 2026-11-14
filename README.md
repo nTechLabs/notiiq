@@ -102,27 +102,26 @@ notiiq/
 
 - Windows
 - Python 3.12
-- Node.js 20 이상
+- Node.js 20.19 이상 또는 22.12 이상
 - npm
 - Ollama 0.40 이상
 - Ollama 모델 `qwen3:8b`
 
 현재 프로젝트는 CPU 환경을 기준으로 구성되어 있으므로 CUDA GPU가 없어도 실행할 수 있습니다.
 
-Ollama 모델 준비:
+## 설치 및 실행 방법
+
+최초 1회는 `설치`부터 진행하고, 이미 설치를 마쳤다면 `실행`부터 순서대로 진행합니다.
+
+### 설치 (최초 1회)
+
+#### 1. Ollama 모델 준비
 
 ```powershell
 ollama pull qwen3:8b
-ollama serve
 ```
 
-Ollama 데스크톱 앱이 실행 중이면 별도로 `ollama serve`를 실행할 필요가 없습니다.
-
-`qwen3:8b`는 일정 추출 시 사고 모드를 사용하지 않으며, CPU 환경의 긴 OCR 입력을 위해 최대 10분까지 응답을 기다립니다. 분석 시간이 초과되면 한 번에 처리하는 이미지 수를 줄이세요.
-
-## 설치
-
-### 1. Python 가상환경
+#### 2. Python 가상환경 및 의존성 설치
 
 프로젝트 루트에서 다음 명령을 실행합니다.
 
@@ -139,7 +138,7 @@ PowerShell 실행 정책 때문에 가상환경을 활성화할 수 없다면 �
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-### 2. Frontend 의존성
+#### 3. Frontend 의존성 설치
 
 ```powershell
 Set-Location frontend
@@ -147,11 +146,39 @@ npm install
 Set-Location ..
 ```
 
-## 실행
+#### 4. 환경변수 설정 (`.env`)
 
-Backend와 Frontend를 서로 다른 터미널에서 실행합니다.
+Backend는 프로젝트 루트의 `.env`를 읽습니다. 로컬에서는 다음과 같이 설정하세요. `OLLAMA_BASE_URL`을 생략해도 로컬 주소가 기본값으로 적용됩니다.
 
-### Backend
+```env
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen3:8b
+PORT=8000
+```
+
+클라우드 배포에서는 Ollama 서비스의 내부 주소 `http://ollama.internal:11434`를 배포 환경변수로 설정하세요. 실제 주소가 다르면 해당 서비스의 내부 주소를 사용합니다. 이미 설정된 환경변수는 `.env`보다 우선합니다.
+
+### 실행 (매번 실행 시)
+
+Ollama, Backend, Frontend를 순서대로 실행합니다. Backend와 Frontend는 서로 다른 터미널에서 실행하세요.
+
+#### 1. Ollama 실행 확인
+
+Ollama 데스크톱 앱이 실행 중이면 별도 명령이 필요 없습니다. 실행 중이 아니라면 다음 명령으로 서버를 시작합니다.
+
+```powershell
+ollama serve
+```
+
+모델 준비 상태 확인:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:11434/api/tags
+```
+
+`qwen3:8b`는 일정 추출 시 사고 모드를 사용하지 않으며, CPU 환경의 긴 OCR 입력을 위해 최대 10분까지 응답을 기다립니다. 분석 시간이 초과되면 한 번에 처리하는 이미지 수를 줄이세요.
+
+#### 2. Backend 실행 (터미널 1)
 
 프로젝트 루트에서:
 
@@ -159,19 +186,14 @@ Backend와 Frontend를 서로 다른 터미널에서 실행합니다.
 .\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Backend 상태 확인:
+Backend 상태 및 API 문서 확인:
 
 ```text
 http://127.0.0.1:8000/api/health
-```
-
-FastAPI API 문서:
-
-```text
 http://127.0.0.1:8000/docs
 ```
 
-### Frontend
+#### 3. Frontend 실행 (터미널 2)
 
 별도 터미널에서:
 
@@ -187,6 +209,41 @@ http://localhost:7173
 ```
 
 Vite 개발 서버는 `/api` 요청을 `http://127.0.0.1:8000`으로 전달합니다.
+
+### 단일 서버(프로덕션 빌드)로 로컬 실행
+
+개발 서버 두 개를 띄우지 않고 FastAPI 하나에서 정적 화면과 API를 함께 실행하려면 Frontend를 먼저 빌드한 뒤 Backend만 실행합니다.
+
+```powershell
+Set-Location frontend
+npm run build
+Set-Location ..
+.\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+```
+
+브라우저 접속 주소:
+
+```text
+http://127.0.0.1:8000
+```
+
+### 휴대폰에서 접속
+
+PC와 휴대폰을 같은 Wi-Fi에 연결한 후 휴대폰 브라우저에서 다음 형식으로 접속합니다.
+
+```text
+http://<PC의-내부-IPv4-주소>:7173
+```
+
+Vite는 `0.0.0.0:7173`에서 요청을 수신하도록 설정되어 있습니다. 현재 PC의 IPv4 주소는 다음 명령으로 확인할 수 있습니다.
+
+```powershell
+Get-NetIPConfiguration |
+  Where-Object { $_.IPv4DefaultGateway -ne $null } |
+  Select-Object -ExpandProperty IPv4Address
+```
+
+접속되지 않으면 Windows 방화벽에서 Node.js 또는 TCP 7173 포트의 개인 네트워크 접근을 허용해야 합니다. 공용 네트워크에는 포트를 개방하지 않는 것을 권장합니다.
 
 ## BizCoder 클라우드 배포
 
@@ -262,24 +319,6 @@ push할 때마다 새 이미지를 빌드해 재배포할 수 있습니다. 회�
 - GPU와 상시 실행 비용 및 월 한도 설정
 - 공개 범위가 `회사 내부 사용자만`인지 확인
 - 배포 보안 검사에서 심각·높음 문제가 없는지 확인
-
-### 휴대폰에서 접속
-
-PC와 휴대폰을 같은 Wi-Fi에 연결한 후 휴대폰 브라우저에서 다음 주소를 엽니다.
-
-```text
-http://192.168.0.128:7173
-```
-
-Vite는 `0.0.0.0:7173`에서 요청을 수신하도록 설정되어 있습니다. PC의 IP가 DHCP로 변경되면 다음 명령으로 현재 IPv4 주소를 다시 확인하세요.
-
-```powershell
-Get-NetIPConfiguration |
-  Where-Object { $_.IPv4DefaultGateway -ne $null } |
-  Select-Object -ExpandProperty IPv4Address
-```
-
-접속되지 않으면 Windows 방화벽에서 Node.js 또는 TCP 7173 포트의 개인 네트워크 접근을 허용해야 합니다. 공용 네트워크에는 포트를 개방하지 않는 것을 권장합니다.
 
 ## 사용 방법
 
@@ -458,6 +497,15 @@ Invoke-RestMethod http://127.0.0.1:8000/api/health
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### `Ollama에 연결할 수 없습니다` 오류가 표시되는 경우
+
+Ollama가 실행 중인지, `qwen3:8b` 모델이 설치되어 있는지, 루트 `.env`의 `OLLAMA_BASE_URL`이 로컬 주소(`http://127.0.0.1:11434`)로 되어 있는지 확인합니다.
+
+```powershell
+ollama list
+Invoke-RestMethod http://127.0.0.1:11434/api/tags
 ```
 
 ### 첫 OCR 요청이 오래 걸리는 경우
