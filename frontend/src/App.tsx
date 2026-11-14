@@ -308,7 +308,9 @@ function App() {
         )}
 
         <button className="primary" type="submit" disabled={isLoading || files.length === 0}>
-          {isLoading ? 'OCR 분석 중…' : `${files.length || ''}개 이미지에서 일정 찾기`}
+          {isLoading
+            ? 'OCR 분석 중…'
+            : `${files.length > 0 ? `${files.length}개 ` : ''}이미지에서 일정 찾기`}
         </button>
         {error && <p className="error" role="alert">{error}</p>}
       </form>
