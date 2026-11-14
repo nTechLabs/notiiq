@@ -16,6 +16,7 @@ from .models import AnalysisResponse, CalendarEvent
 from .ocr_service import OcrService, get_ocr_service
 
 MAX_FILE_SIZE = 10 * 1024 * 1024
+MAX_TEXT_LENGTH = 20_000
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 app = FastAPI(title="Notiiq API", version="0.1.0")
@@ -128,26 +129,33 @@ async def _validated_images(files: list[UploadFile]) -> AsyncIterator[bytes]:
 
 
 @app.post("/api/analyze", response_model=AnalysisResponse)
-async def analyze_images(
-    files: list[UploadFile] = File(...),
+async def analyze_inputs(
+    files: list[UploadFile] | None = File(default=None),
+    text: str | None = Form(default=None, max_length=MAX_TEXT_LENGTH),
     ocr_service: OcrService = Depends(get_ocr_service),
     schedule_analyzer: OllamaScheduleAnalyzer = Depends(get_schedule_analyzer),
 ) -> AnalysisResponse:
-    if not files:
-        raise HTTPException(status_code=400, detail="이미지 파일을 한 개 이상 선택하세요.")
-    if len(files) > 20:
+    uploaded_files = files or []
+    submitted_text = text.strip() if text else ""
+    if not uploaded_files and not submitted_text:
+        raise HTTPException(status_code=400, detail="이미지 또는 텍스트를 입력하세요.")
+    if len(uploaded_files) > 20:
         raise HTTPException(status_code=400, detail="한 번에 최대 20개까지 처리할 수 있습니다.")
 
     lines: list[str] = []
     try:
-        async for image in _validated_images(files):
+        async for image in _validated_images(uploaded_files):
             lines.extend(ocr_service.read(image))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    text = "\n".join(line.strip() for line in lines if line.strip())
+    input_parts = ["\n".join(line.strip() for line in lines if line.strip())]
+    if submitted_text:
+        input_parts.append(submitted_text)
+    analysis_text = "\n".join(part for part in input_parts if part)
+
     try:
-        events = await schedule_analyzer.extract_events(text)
+        events = await schedule_analyzer.extract_events(analysis_text)
     except OllamaUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except OllamaTimeoutError as exc:
@@ -156,7 +164,8 @@ async def analyze_images(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return AnalysisResponse(
-        text=text,
+        text=analysis_text,
         events=events,
-        processed_files=len(files),
+        processed_files=len(uploaded_files),
+        processed_text=bool(submitted_text),
     )

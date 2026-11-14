@@ -13,8 +13,14 @@ class FakeOcrService:
 
 
 class FakeScheduleAnalyzer:
+    def __init__(
+        self,
+        expected_text: str = "11월 15일 오후 3시 프로젝트 회의",
+    ) -> None:
+        self.expected_text = expected_text
+
     async def extract_events(self, text: str) -> list[CalendarEvent]:
-        assert text == "11월 15일 오후 3시 프로젝트 회의"
+        assert text == self.expected_text
         start = datetime(2026, 11, 15, 15)
         return [
             CalendarEvent(
@@ -48,8 +54,52 @@ def test_analyze_uses_memory_only_service() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["processed_files"] == 1
+    assert payload["processed_text"] is False
     assert payload["analysis_method"] == "ollama"
     assert payload["events"][0]["title"] == "프로젝트 회의"
+
+
+def test_analyze_accepts_text_without_an_image() -> None:
+    text = "11월 15일 오후 3시 프로젝트 회의"
+    app.dependency_overrides[get_schedule_analyzer] = lambda: FakeScheduleAnalyzer(text)
+    try:
+        response = TestClient(app).post("/api/analyze", data={"text": text})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["text"] == text
+    assert payload["processed_files"] == 0
+    assert payload["processed_text"] is True
+
+
+def test_analyze_combines_image_and_direct_text() -> None:
+    direct_text = "좋아, 그때 보자"
+    combined_text = f"11월 15일 오후 3시 프로젝트 회의\n{direct_text}"
+    app.dependency_overrides[get_ocr_service] = lambda: FakeOcrService()
+    app.dependency_overrides[get_schedule_analyzer] = lambda: FakeScheduleAnalyzer(combined_text)
+    try:
+        response = TestClient(app).post(
+            "/api/analyze",
+            data={"text": direct_text},
+            files={"files": ("capture.jpg", b"image", "image/jpeg")},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["text"] == combined_text
+    assert payload["processed_files"] == 1
+    assert payload["processed_text"] is True
+
+
+def test_analyze_rejects_empty_input() -> None:
+    response = TestClient(app).post("/api/analyze", data={"text": "   "})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "이미지 또는 텍스트를 입력하세요."
 
 
 def test_analyze_rejects_non_image() -> None:

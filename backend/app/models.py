@@ -17,4 +17,5 @@ class AnalysisResponse(BaseModel):
     text: str
     events: list[CalendarEvent]
     processed_files: int
+    processed_text: bool
     analysis_method: Literal["ollama"] = "ollama"

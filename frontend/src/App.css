@@ -148,6 +148,61 @@ h1 {
   line-height: 1;
 }
 
+.input-divider {
+  margin: 18px 0;
+  color: #8a948f;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.input-divider::before,
+.input-divider::after {
+  height: 1px;
+  background: #e1e7df;
+  content: "";
+  flex: 1;
+}
+
+.text-input {
+  color: #233d32;
+  display: grid;
+  gap: 8px;
+}
+
+.text-input textarea {
+  width: 100%;
+  min-height: 150px;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  resize: vertical;
+  border: 1px solid #d6dfd7;
+  border-radius: 14px;
+  outline: 0;
+  background: #f7faf6;
+  color: #24352e;
+  font: inherit;
+  line-height: 1.6;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.text-input textarea:hover,
+.text-input textarea:focus {
+  border-color: #ee6b43;
+  background: #fffaf5;
+}
+
+.text-input textarea:focus {
+  box-shadow: 0 0 0 3px rgba(238, 107, 67, 0.15);
+}
+
+.text-input small {
+  color: #78827d;
+  text-align: right;
+}
+
 button {
   border: 0;
   font: inherit;

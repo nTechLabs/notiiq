@@ -14,6 +14,7 @@ type AnalysisResponse = {
   text: string
   events: CalendarEvent[]
   processed_files: number
+  processed_text: boolean
   analysis_method: 'ollama'
 }
 
@@ -88,6 +89,7 @@ export function createGoogleCalendarUrl(event: CalendarEvent) {
 
 function App() {
   const [files, setFiles] = useState<File[]>([])
+  const [directText, setDirectText] = useState('')
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -153,6 +155,11 @@ function App() {
 
   function removeFile(fileToRemove: File) {
     setFiles((currentFiles) => currentFiles.filter((file) => file !== fileToRemove))
+    setAnalysis(null)
+  }
+
+  function updateDirectText(value: string) {
+    setDirectText(value)
     setAnalysis(null)
   }
 
@@ -223,20 +230,24 @@ function App() {
 
   async function analyze(event: FormEvent) {
     event.preventDefault()
-    if (files.length === 0) {
-      setError('캡처 이미지를 한 개 이상 선택해 주세요.')
+    const submittedText = directText.trim()
+    if (files.length === 0 && !submittedText) {
+      setError('이미지 또는 대화 텍스트를 입력해 주세요.')
       return
     }
 
     const formData = new FormData()
     files.forEach((file) => formData.append('files', file))
+    if (submittedText) {
+      formData.append('text', submittedText)
+    }
     setIsLoading(true)
     setError('')
     try {
       const response = await fetch('/api/analyze', { method: 'POST', body: formData })
       const payload = await response.json().catch(() => null)
       if (!response.ok) {
-        throw new Error(payload?.detail ?? `이미지를 분석하지 못했습니다. (${response.status})`)
+        throw new Error(payload?.detail ?? `입력 내용을 분석하지 못했습니다. (${response.status})`)
       }
       setAnalysis(payload)
     } catch (reason) {
@@ -252,13 +263,15 @@ function App() {
     }
   }
 
+  const hasDirectText = directText.trim().length > 0
+
   return (
     <main>
       <header>
         <p className="eyebrow">PRIVATE SCHEDULE ASSISTANT</p>
-        <h1>대화 캡처에서<br />일정만 꺼내세요.</h1>
+        <h1>대화 내용에서<br />일정만 꺼내세요.</h1>
         <p className="lead">
-          이미지는 메모리에서 OCR 처리되고 로컬 AI가 일정 문맥을 분석합니다.
+          캡처 이미지는 메모리에서 OCR 처리되고, 직접 입력한 텍스트와 함께 로컬 AI가 일정 문맥을 분석합니다.
           데이터는 PC 밖으로 전송되거나 서버에 저장되지 않습니다.
         </p>
       </header>
@@ -307,10 +320,31 @@ function App() {
           </div>
         )}
 
-        <button className="primary" type="submit" disabled={isLoading || files.length === 0}>
+        <div className="input-divider"><span>또는</span></div>
+
+        <label className="text-input">
+          <strong>대화 텍스트 직접 입력</strong>
+          <textarea
+            value={directText}
+            maxLength={20000}
+            placeholder="일정이 포함된 대화나 안내문 내용을 붙여 넣으세요."
+            onChange={(event) => updateDirectText(event.target.value)}
+          />
+          <small>{directText.length.toLocaleString()} / 20,000자</small>
+        </label>
+
+        <button
+          className="primary"
+          type="submit"
+          disabled={isLoading || (files.length === 0 && !hasDirectText)}
+        >
           {isLoading
-            ? 'OCR 분석 중…'
-            : `${files.length > 0 ? `${files.length}개 ` : ''}이미지에서 일정 찾기`}
+            ? '일정 분석 중…'
+            : files.length > 0
+              ? `${files.length}개 이미지${hasDirectText ? '와 텍스트' : ''}에서 일정 찾기`
+              : hasDirectText
+                ? '텍스트에서 일정 찾기'
+                : '이미지 또는 텍스트에서 일정 찾기'}
         </button>
         {error && <p className="error" role="alert">{error}</p>}
       </form>
@@ -322,12 +356,16 @@ function App() {
               <p className="eyebrow">ANALYSIS RESULT</p>
               <h2>찾은 일정 {analysis.events.length}개</h2>
             </div>
-            <span>{analysis.processed_files}개 이미지 · 로컬 AI 분석 완료</span>
+            <span>
+              {analysis.processed_files > 0 && `${analysis.processed_files}개 이미지 · `}
+              {analysis.processed_text && '직접 입력 텍스트 · '}
+              로컬 AI 분석 완료
+            </span>
           </div>
 
           {analysis.events.length === 0 ? (
             <div className="empty">
-              날짜가 포함된 일정을 찾지 못했습니다. OCR 텍스트를 확인해 주세요.
+              날짜가 포함된 일정을 찾지 못했습니다. 분석 텍스트를 확인해 주세요.
             </div>
           ) : (
             <div className="event-list">
@@ -392,7 +430,7 @@ function App() {
           )}
 
           <details>
-            <summary>OCR 텍스트 확인</summary>
+            <summary>분석 텍스트 확인</summary>
             <pre>{analysis.text}</pre>
           </details>
         </section>
@@ -400,7 +438,7 @@ function App() {
 
       <footer>
         <strong>대화 내용 비저장 원칙</strong>
-        <span>업로드 이미지와 OCR 텍스트는 요청 처리 후 메모리에서 폐기됩니다.</span>
+        <span>업로드 이미지와 입력·OCR 텍스트는 요청 처리 후 메모리에서 폐기됩니다.</span>
       </footer>
     </main>
   )
