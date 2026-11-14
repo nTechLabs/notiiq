@@ -1,4 +1,5 @@
 from functools import lru_cache
+import os
 from threading import Lock
 
 import cv2
@@ -15,7 +16,19 @@ class OcrService:
         if self._reader is None:
             with self._lock:
                 if self._reader is None:
-                    self._reader = easyocr.Reader(["ko", "en"], gpu=False)
+                    model_storage_directory = os.getenv(
+                        "EASYOCR_MODEL_STORAGE_DIRECTORY"
+                    )
+                    download_enabled = (
+                        os.getenv("EASYOCR_DOWNLOAD_ENABLED", "true").lower()
+                        == "true"
+                    )
+                    self._reader = easyocr.Reader(
+                        ["ko", "en"],
+                        gpu=False,
+                        model_storage_directory=model_storage_directory,
+                        download_enabled=download_enabled,
+                    )
         return self._reader
 
     def read(self, image_bytes: bytes) -> list[str]:

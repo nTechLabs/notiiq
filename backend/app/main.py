@@ -1,9 +1,12 @@
 from collections.abc import AsyncIterator
 from datetime import datetime
+import os
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .llm_service import (
     OllamaResponseError,
@@ -169,3 +172,13 @@ async def analyze_inputs(
         processed_files=len(uploaded_files),
         processed_text=bool(submitted_text),
     )
+
+
+frontend_dist = Path(
+    os.getenv(
+        "FRONTEND_DIST_DIR",
+        str(Path(__file__).resolve().parents[2] / "frontend" / "dist"),
+    )
+)
+if frontend_dist.is_dir():
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")

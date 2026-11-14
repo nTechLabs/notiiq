@@ -271,8 +271,8 @@ function App() {
         <p className="eyebrow">PRIVATE SCHEDULE ASSISTANT</p>
         <h1>대화 내용에서<br />일정만 꺼내세요.</h1>
         <p className="lead">
-          캡처 이미지는 메모리에서 OCR 처리되고, 직접 입력한 텍스트와 함께 로컬 AI가 일정 문맥을 분석합니다.
-          데이터는 PC 밖으로 전송되거나 서버에 저장되지 않습니다.
+          캡처 이미지는 배포 환경의 메모리에서 OCR 처리되고, 직접 입력한 텍스트와 함께 전용 AI가 일정 문맥을 분석합니다.
+          입력 데이터는 파일이나 데이터베이스에 저장되지 않습니다.
         </p>
       </header>
 
@@ -359,7 +359,7 @@ function App() {
             <span>
               {analysis.processed_files > 0 && `${analysis.processed_files}개 이미지 · `}
               {analysis.processed_text && '직접 입력 텍스트 · '}
-              로컬 AI 분석 완료
+              전용 AI 분석 완료
             </span>
           </div>
 
@@ -438,7 +438,7 @@ function App() {
 
       <footer>
         <strong>대화 내용 비저장 원칙</strong>
-        <span>업로드 이미지와 입력·OCR 텍스트는 요청 처리 후 메모리에서 폐기됩니다.</span>
+        <span>업로드 이미지와 입력·OCR 텍스트는 배포 환경에서 요청 처리 후 폐기됩니다.</span>
       </footer>
     </main>
   )
