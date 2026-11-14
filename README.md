@@ -18,6 +18,37 @@
 - 업로드 이미지 및 OCR 텍스트 비저장
 - 모바일 화면과 키보드 탐색 지원
 
+## 2026-11-14 진행 현황
+
+완료:
+
+- 이미지가 없을 때 분석 버튼에 불필요한 `개`가 표시되던 문구 수정
+- 이미지 선택 후 선택 개수를 분석 버튼에 표시
+- 이미지, 직접 입력 텍스트, 이미지와 텍스트 동시 분석 지원
+- `/api/analyze`의 `files`와 `text`를 선택 입력으로 확장하고 빈 입력 거부
+- 응답에 직접 입력 텍스트 처리 여부를 나타내는 `processed_text` 추가
+- React 프로덕션 빌드를 FastAPI가 같은 도메인에서 제공하도록 구성
+- React/FastAPI/EasyOCR 웹 이미지와 Ollama `qwen3:8b` 이미지를 분리
+- EasyOCR 한국어·영어 모델을 웹 이미지에 포함하고 런타임 다운로드 차단
+- 비루트 컨테이너, 헬스 체크, 기반 이미지 digest 고정, 민감한 `capture` 빌드 제외
+- BizCoder에서 `nTechLabs/notiiq` GitHub 저장소 연결
+
+검증:
+
+- Backend 전체 테스트 20개 통과
+- Frontend 테스트, lint, TypeScript/Vite production build 통과
+- 두 Docker 이미지 빌드 성공
+- 웹 컨테이너에서 `/api/health`, React 페이지, 비루트 실행, EasyOCR 초기화 확인
+- Ollama 이미지의 시작 스크립트와 헬스 체크 확인
+
+남은 운영 작업:
+
+- BizCoder에서 `deploy/ollama`를 비공개 GPU 서비스로 실제 배포
+- `/root/.ollama` 영속 디스크 연결과 `qwen3:8b` 모델 준비 확인
+- Ollama 내부 주소를 `OLLAMA_BASE_URL`로 설정해 루트 웹 이미지 배포
+- 공개 범위를 회사 내부 사용자로 제한하고 텍스트·합성 이미지 E2E 검증
+- BizCoder의 요청 본문 크기, 최대 요청 시간, GPU 비용과 월 한도 확인
+
 ## 기술 구성
 
 | 구분 | 기술 |
@@ -26,6 +57,7 @@
 | Backend | FastAPI, Pydantic |
 | OCR | EasyOCR, PyTorch CPU, OpenCV |
 | AI | Ollama, qwen3:8b |
+| Deployment | Docker, BizCoder, Onpod |
 | Test | Pytest, Vitest, oxlint |
 | Python | 3.12 |
 
@@ -35,6 +67,7 @@
 notiiq/
 ├─ Dockerfile
 ├─ .dockerignore
+├─ .gitattributes
 ├─ .env.example
 ├─ .github/
 │  └─ agents/
@@ -381,6 +414,21 @@ npm test
 Set-Location frontend
 npm run build
 ```
+
+### Docker 이미지와 런타임
+
+```powershell
+docker build --tag notiiq-app:validation .
+docker build --tag notiiq-ollama:validation .\deploy\ollama
+docker run --rm --publish 8000:8000 `
+  --env OLLAMA_BASE_URL=http://ollama.internal:11434 `
+  notiiq-app:validation
+```
+
+웹 이미지가 실행되면 `http://127.0.0.1:8000/api/health`와
+`http://127.0.0.1:8000/`을 확인합니다. Ollama 이미지를 기본 실행하면 `qwen3:8b`
+다운로드가 시작되므로 모델·GPU 통합 검증은 배포 환경에서 영속 디스크를 연결한 뒤
+진행합니다.
 
 테스트 코드에는 실제 대화 내용을 복사하지 말고 합성된 문장을 사용하세요.
 
